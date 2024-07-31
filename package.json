@@ -13,8 +13,10 @@
   "dependencies": {
     "@matpool/vue-json-view": "^0.1.8",
     "@zip.js/zip.js": "^2.7.47",
+    "highlight.js": "^11.10.0",
     "markdown-it": "^14.1.0",
     "vue": "^3.4.29",
+    "vue-highlight-code": "^0.2.0",
     "vuestic-ui": "^1.9.12"
   },
   "devDependencies": {

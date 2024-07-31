@@ -1,14 +1,13 @@
 <template>
   <VaNavbar color="#282F69" class="h-24">
     <template #left>
-      <VaNavbarItem class="logo">
-        Boox Text Note Converter
-      </VaNavbarItem>
+      <VaNavbarItem class="logo"> Boox Text Note Converter </VaNavbarItem>
     </template>
     <template #right>
       <VaNavbarItem>
         <a href="https://github.com/uroybd/boox-text-note-converter/issues" style="color: white">
-        <VaIcon name="bug_report"></VaIcon></a>
+          <VaIcon name="bug_report"></VaIcon
+        ></a>
       </VaNavbarItem>
     </template>
   </VaNavbar>
@@ -16,7 +15,6 @@
   <main class="p-3">
     <VaFileUpload v-model="noteFile" dropzone file-types="note,zip" />
     <div class="row content-pane" v-if="previewOutput">
-
       <div class="flex flex-col md6">
         <VaCard class="item content">
           <VaCardTitle>Preview</VaCardTitle>
@@ -29,17 +27,35 @@
         </div> -->
       </div>
       <div class="flex flex-col md6">
+        <VaTabs v-model="selectedTab" class="w-[280px] px-3">
+          <template #tabs>
+            <VaTab v-for="title in ['Markdown', 'HTML']" :key="title" :name="title">
+              {{ title }}
+            </VaTab>
+          </template>
+        </VaTabs>
 
-        <VaCard class="item content">
-          <VaCardTitle>Generated</VaCardTitle>
-
-<VaCardActions align="end" style="width: 100%; justify-content: flex-end;">
-        <VaButton round preset="secondary" @click.prevent="onCopy()" icon="content_copy">Copy</VaButton>
-        <VaButton @click.prevent="onDownload()" round icon="download">Download</VaButton>
-      </VaCardActions>
+        <VaCard class="item content" v-if="selectedTab == 'Markdown'">
+          <VaCardActions align="end" style="width: 100%; justify-content: flex-end">
+            <VaButton round preset="secondary" @click.prevent="onCopy()" icon="content_copy"
+              >Copy</VaButton
+            >
+            <VaButton @click.prevent="onDownload()" round icon="download">Download</VaButton>
+          </VaCardActions>
           <VaCardContent>
+            <pre>{{ markdownOutput }}</pre>
+          </VaCardContent>
+        </VaCard>
 
-          <pre>{{ markdownOutput }}</pre>
+        <VaCard class="item content" v-else>
+          <VaCardActions align="end" style="width: 100%; justify-content: flex-end">
+            <VaButton round preset="secondary" icon="content_copy">Copy</VaButton>
+            <VaButton round icon="download">Download</VaButton>
+          </VaCardActions>
+
+          <VaCardContent>
+            <HighCode lang="html" width="100%" height="80%" :copy="false" :codeValue="htmlCode">
+            </HighCode>
           </VaCardContent>
         </VaCard>
       </div>
@@ -48,109 +64,114 @@
 </template>
 
 <script setup>
-import { ref, watch, computed } from 'vue';
-import * as zip from "@zip.js/zip.js";
-import VueJsonView from '@matpool/vue-json-view'
-import MarkdownRenderer from './renderers/markdown';
-import PreviewRenderer from './renderers/preview';
-import MarkdownIt from "markdown-it";
+import * as zip from '@zip.js/zip.js'
+import MarkdownIt from 'markdown-it'
+import { computed, ref, watch } from 'vue'
+import { HighCode } from 'vue-highlight-code'
+import 'vue-highlight-code/dist/style.css'
+import HTMLRenderer from './renderers/html'
+import MarkdownRenderer from './renderers/markdown'
+import PreviewRenderer from './renderers/preview'
 
-const noteFile = ref([]);
-const files = ref([]);
-const readerClient = ref(null);
+const noteFile = ref([])
+const files = ref([])
+const readerClient = ref(null)
+const selectedTab = ref('Markdown')
+const htmlCode = ref('')
 
 const readZipFilelist = async () => {
-  const entries = await readerClient.value.getEntries({});
+  const entries = await readerClient.value.getEntries({})
   if (entries && entries.length) {
     const resources = entries.filter((e) => {
-      return e.filename.includes("/resource/data/") && !e.filename.endsWith("/")
+      return e.filename.includes('/resource/data/') && !e.filename.endsWith('/')
     })
-    files.value = await Promise.all(resources.map(async (e) => {
-      var writer = e.filename.endsWith(".html") ? new zip.TextWriter() : new zip.BlobWriter();
-      var content = await e.getData(writer);
-      if (e.filename.endsWith(".html")) {
-        content = JSON.parse(content);
-      }
-      return {
-        name: e.filename,
-        entry: e,
-        content: content,
-      }
-
-    }));
-    console.log(files.value)
+    files.value = await Promise.all(
+      resources.map(async (e) => {
+        var writer = e.filename.endsWith('.html') ? new zip.TextWriter() : new zip.BlobWriter()
+        var content = await e.getData(writer)
+        if (e.filename.endsWith('.html')) {
+          content = JSON.parse(content)
+        }
+        return {
+          name: e.filename,
+          entry: e,
+          content: content
+        }
+      })
+    )
   } else {
-    files.value = [];
+    files.value = []
   }
-};
-
+}
 
 const contentFile = computed(() => {
-  return files.value.find((f) => f.name.endsWith(".html"));
-});
+  return files.value.find((f) => f.name.endsWith('.html'))
+})
 
-const markdownOutput = ref('');
-const previewOutput = ref('');
+const markdownOutput = ref('')
+const previewOutput = ref('')
 
 watch(contentFile, (newVal) => {
   if (newVal) {
-    const renderer = new MarkdownRenderer(newVal.content, files.value);
+    const renderer = new MarkdownRenderer(newVal.content, files.value)
     renderer.render().then((output) => {
-      markdownOutput.value = output;
-    });
-    const previewRenderer = new PreviewRenderer(newVal.content, files.value);
-    previewRenderer.render().then((output) => {
-      const markdown = new MarkdownIt();
-      previewOutput.value = markdown.render(output);
-    });
-  }
-});
+      markdownOutput.value = output
+    })
 
+    const htmlRenderer = new HTMLRenderer(newVal.content, files.value)
+    htmlRenderer.render().then((output) => {
+      console.log({ output })
+      htmlCode.value = output
+    })
+    const previewRenderer = new PreviewRenderer(newVal.content, files.value)
+    previewRenderer.render().then((output) => {
+      const markdown = new MarkdownIt()
+      previewOutput.value = markdown.render(output)
+    })
+  }
+})
 
 const onDownload = async () => {
-  const a = document.createElement('a');
-  let url;
+  const a = document.createElement('a')
+  let url
   if (files.value.length === 0) {
-    return;
+    return
   }
   if (files.value.length === 1) {
-
-  const blob = new Blob([markdownOutput.value], { type: 'text/markdown' });
-  url = URL.createObjectURL(blob);
-  a.href = url;
-  a.download = `${noteFile.value[0].name.replace('.note', '')}.md`;
+    const blob = new Blob([markdownOutput.value], { type: 'text/markdown' })
+    url = URL.createObjectURL(blob)
+    a.href = url
+    a.download = `${noteFile.value[0].name.replace('.note', '')}.md`
   } else {
     const zipWriter = new zip.ZipWriter(new zip.BlobWriter(), {
-      bufferedWrite: true,
-    });
-    
-  const mdBlob = new Blob([markdownOutput.value], { type: 'text/markdown' });
-  zipWriter.add(`${noteFile.value[0].name.replace('.note', '')}.md`, new zip.BlobReader(mdBlob));
+      bufferedWrite: true
+    })
+
+    const mdBlob = new Blob([markdownOutput.value], { type: 'text/markdown' })
+    zipWriter.add(`${noteFile.value[0].name.replace('.note', '')}.md`, new zip.BlobReader(mdBlob))
 
     files.value.forEach((f) => {
-      if (!f.name.endsWith(".html")) {
-      const name = f.name.split('/').pop();
-      zipWriter.add(name, new zip.BlobReader(f.content));
+      if (!f.name.endsWith('.html')) {
+        const name = f.name.split('/').pop()
+        zipWriter.add(name, new zip.BlobReader(f.content))
       }
-    });
-    url = URL.createObjectURL(await zipWriter.close());
-    a.href = url;
-    a.download = `${noteFile.value[0].name.replace('.note', '')}.zip`;
+    })
+    url = URL.createObjectURL(await zipWriter.close())
+    a.href = url
+    a.download = `${noteFile.value[0].name.replace('.note', '')}.zip`
   }
-  a.click();
-  URL.revokeObjectURL(url);
-};
-
+  a.click()
+  URL.revokeObjectURL(url)
+}
 
 const onCopy = () => {
-  navigator.clipboard.writeText(markdownOutput.value);
-};
+  navigator.clipboard.writeText(markdownOutput.value)
+}
 
 watch(noteFile, async (newVal) => {
-  readerClient.value = new zip.ZipReader(new zip.BlobReader(newVal[0]));
-  await readZipFilelist();
-});
-
+  readerClient.value = new zip.ZipReader(new zip.BlobReader(newVal[0]))
+  await readZipFilelist()
+})
 </script>
 
 <style lang="scss" scoped>
